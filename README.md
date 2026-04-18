@@ -24,7 +24,7 @@ Web aplikacija za generiranje i ispis naljepnica s barcodom na A4 papir (format 
 1. Napravi novi repozitorij na GitHubu
 2. Uploadaj sve datoteke
 3. Idi na **Settings → Pages → Source: main / root**
-4. Aplikacija je dostupna na https://github.com/tvlahov06/generator-naljepnica
+4. Aplikacija je dostupna na `https://tvoj-username.github.io/naziv-repozitorija`
 
 ## Struktura
 
