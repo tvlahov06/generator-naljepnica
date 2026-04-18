@@ -3,14 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1a6fd4">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Naljepnice">
-<link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" href="./favicon.ico">
 <title>Generator Naljepnica</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
@@ -229,47 +221,51 @@ const CODE128 = (() => {
   .a4-sheet {
     background: white;
     width: 210mm;
-    min-height: 297mm;
+    height: 297mm;
     box-shadow: 0 4px 32px rgba(0,0,0,0.4);
-    padding: 0mm;
+    padding: 0;
+    margin: 0;
     display: grid;
     grid-template-columns: repeat(4, 52.5mm);
     grid-template-rows: repeat(10, 29.7mm);
-    column-gap: 0mm;
-    row-gap: 0mm;
-    align-content: start;
+    column-gap: 0;
+    row-gap: 0;
+    overflow: hidden;
   }
 
   .label {
     width: 52.5mm;
     height: 29.7mm;
+    max-height: 29.7mm;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 0.85mm 1mm;
+    padding: 1.2mm 2mm 1.2mm;
     overflow: hidden;
     box-sizing: border-box;
+    flex-shrink: 0;
   }
   .label .lbl-name {
-    font-size: 6pt;
+    font-size: 5.5pt;
     font-weight: 600;
     text-align: center;
     line-height: 1.2;
-    width: 100%;
-    height: 7mm;
+    width: 42mm;
+    height: 10mm;
     color: #000;
     font-family: 'DM Sans', sans-serif;
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     flex-shrink: 0;
+    padding-top: 3.5mm;
   }
-  .label svg { width: 50mm !important; height: 16mm !important; display: block; flex-shrink: 0; }
+  .label svg { width: 42mm !important; height: 12mm !important; display: block; flex-shrink: 0; }
   .label .lbl-bc-num {
     font-family: 'DM Mono', monospace;
-    font-size: 6.5pt;
+    font-size: 6pt;
     font-weight: 500;
     color: #000;
     letter-spacing: 0.06em;
@@ -277,65 +273,48 @@ const CODE128 = (() => {
     align-self: center;
     height: 3mm;
     line-height: 1;
+    padding-bottom: 0.3mm;
   }
 
   @media print {
     @page { size: A4; margin: 0mm; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    header, .sidebar, .toolbar { display: none !important; }
-    .app { display: block !important; }
-    .main { display: block !important; }
+    html, body { margin: 0; padding: 0; width: 210mm; }
+    header, .sidebar, .toolbar, .preview-area > :not(#sheet-container) { display: none !important; }
+    .app, .main { display: block !important; height: auto !important; }
     .preview-area {
-      position: fixed; top: 0; left: 0; width: 210mm;
-      padding: 0; margin: 0; background: white; overflow: visible;
       display: block !important;
+      position: static !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      background: white !important;
+      overflow: visible !important;
+      width: 210mm !important;
+      height: auto !important;
     }
-    #sheet-container { display: block; }
-    .a4-sheet { box-shadow: none; margin: 0; padding: 0; page-break-after: always; }
-    .a4-sheet:last-child { page-break-after: avoid; }
-  }
-
-  /* ─── MOBILE ─── */
-  @media (max-width: 700px) {
-    .app {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-      height: auto;
-      min-height: calc(100vh - 49px);
-    }
-    .sidebar {
-      border-right: none;
-      border-bottom: 1px solid var(--border);
-      max-height: 55vh;
-    }
-    .article-list {
-      max-height: 160px;
-    }
-    .main {
-      height: auto;
-    }
-    .preview-area {
-      padding: 12px;
-      min-height: 400px;
-      align-items: flex-start;
+    #sheet-container {
+      display: block !important;
+      width: 210mm;
     }
     .a4-sheet {
-      transform-origin: top left;
-      transform: scale(var(--sheet-scale, 0.45));
-      margin-bottom: calc((297mm * var(--sheet-scale, 0.45)) - 297mm);
+      box-shadow: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 210mm !important;
+      height: 297mm !important;
+      page-break-after: always;
+      break-after: page;
+      overflow: hidden !important;
     }
-    .toolbar {
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 10px 12px;
+    .a4-sheet:last-child {
+      page-break-after: avoid;
+      break-after: avoid;
     }
-    .toolbar-info {
-      width: 100%;
-      margin-left: 0;
-      font-size: 11px;
+    .label {
+      overflow: hidden !important;
+      height: 29.7mm !important;
+      max-height: 29.7mm !important;
     }
-    header h1 { font-size: 13px; }
-    header span { display: none; }
   }
 </style>
 </head>
@@ -638,28 +617,6 @@ dz.addEventListener('drop', e => {
 });
 
 render();
-
-// PWA - Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  });
-}
-
-// Mobile scale - fit A4 sheet to screen width
-function updateSheetScale() {
-  const previewEl = document.querySelector('.preview-area');
-  if (!previewEl) return;
-  const availW = previewEl.clientWidth - 24;
-  const sheetMM = 210;
-  const sheetPx = sheetMM * 3.7795;
-  const scale = Math.min(1, availW / sheetPx);
-  document.documentElement.style.setProperty('--sheet-scale', scale.toFixed(3));
-}
-window.addEventListener('resize', updateSheetScale);
-window.addEventListener('load', updateSheetScale);
-updateSheetScale();
-
 </script>
 </body>
 </html>
