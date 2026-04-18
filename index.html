@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a6fd4">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Naljepnice">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="./favicon.ico">
+<title>Generator Naljepnica</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const CODE128 = (() => {
+  const CHARS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+  const ENCODE = [
+    '11011001100','11001101100','11001100110','10010011000','10010001100','10001001100',
+    '10011001000','10011000100','10001100100','11001001000','11001000100','11000100100',
+    '10110011100','10011011100','10011001110','10111001100','10011101100','10011100110',
+    '11001110010','11001011100','11001001110','11011100100','11001110100','11101101110',
+    '11101001100','11100101100','11100100110','11101100100','11100110100','11100110010',
+    '11011011000','11011000110','11000110110','10100011000','10001011000','10001000110',
+    '10110001000','10001101000','10001100010','11010001000','11000101000','11000100010',
+    '10110111000','10110001110','10001101110','10111011000','10111000110','10001110110',
+    '11101110110','11010001110','11000101110','11011101000','11011100010','11011101110',
+    '11101011000','11101000110','11100010110','11101101000','11101100010','11100011010',
+    '11101111010','11001000010','11110001010','10100110000','10100001100','10010110000',
+    '10010000110','10000101100','10000100110','10110010000','10110000100','10011010000',
+    '10011000010','10000110100','10000110010','11000010010','11001010000','11110111010',
+    '11000010100','10001111010','10100111100','10010111100','10010011110','10111100100',
+    '10011110100','10011110010','11110100100','11110010100','11110010010','11011011110',
+    '11011110110','11110110110','10101111000','10100011110','10001011110','10111101000',
+    '10111100010','11110101000','11110100010','10111011110','10111101110','11101011110',
+    '11110101110','11010000100','11010010000','11010011100','1100011101011'
+  ];
+  const START_B = 104, STOP = 106;
+
+  function encode(text) {
+    let vals = [START_B];
+    let check = START_B;
+    for (let i = 0; i < text.length; i++) {
+      const c = CHARS.indexOf(text[i]);
+      if (c < 0) return null;
+      vals.push(c);
+      check += c * (i + 1);
+    }
+    vals.push(check % 103);
+    vals.push(STOP);
+    return vals.map(v => ENCODE[v]).join('');
+  }
+
+  function draw(svg, text, barW, barH) {
+    const bars = encode(text);
+    if (!bars) throw new Error('Cannot encode: ' + text);
+    const w = barW || 1.3;
+    const totalW = bars.length * w;
+    svg.setAttribute('viewBox', '0 0 ' + totalW + ' 1');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    svg.innerHTML = '';
+    for (let i = 0; i < bars.length; i++) {
+      if (bars[i] === '1') {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        rect.setAttribute('x', i * w);
+        rect.setAttribute('y', 0);
+        rect.setAttribute('width', w);
+        rect.setAttribute('height', 1);
+        rect.setAttribute('fill', '#000');
+        svg.appendChild(rect);
+      }
+    }
+  }
+  return { draw };
+})();
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #f0ede8;
+    --surface: #ffffff;
+    --border: #d4cfc8;
+    --text: #1a1714;
+    --muted: #7a746d;
+    --accent: #1a6fd4;
+    --accent2: #c0392b;
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1a6fd4 0%, #0f4a9c 100%);
+    color: #fff;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  header span { font-family: 'DM Mono', monospace; font-size: 11px; opacity: 0.5; margin-left: auto; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    height: calc(100vh - 49px);
+  }
+
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab {
+    flex: 1; padding: 12px 8px; font-size: 12px; font-weight: 600; text-align: center;
+    cursor: pointer; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
+    border-bottom: 2px solid transparent; transition: all 0.15s;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; flex: 1; overflow: auto; padding: 18px; }
+  .tab-content.active { display: flex; flex-direction: column; gap: 12px; }
+
+  label {
+    display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 5px;
+  }
+  input[type="text"], input[type="number"], textarea, select {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--border);
+    border-radius: var(--radius); font-family: 'DM Mono', monospace; font-size: 13px;
+    background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 60px; font-family: 'DM Sans', sans-serif; font-size: 13px; }
+
+  .qty-row { display: flex; gap: 8px; align-items: flex-end; }
+  .qty-row > div:first-child { flex: 1; }
+
+  .btn {
+    padding: 9px 16px; border: none; border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-primary { background: linear-gradient(135deg, #1a6fd4 0%, #0f4a9c 100%); color: #fff; width: 100%; }
+  .btn-primary:hover { opacity: 0.82; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; width: auto; }
+  .btn-danger { background: #fee; color: var(--accent2); border: 1px solid #fcc; }
+  .btn-danger:hover { background: var(--accent2); color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--bg); }
+
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 12px 16px; text-align: center; cursor: pointer; transition: all 0.15s; display: block;
+  }
+  .upload-zone:hover { border-color: var(--accent); background: var(--bg); }
+  .upload-zone input { display: none; }
+  .upload-zone .icon { font-size: 20px; margin-bottom: 4px; }
+  .upload-zone p { font-size: 12px; color: var(--muted); }
+  .upload-zone strong { color: var(--text); }
+
+  .article-list { flex: 1; overflow-y: auto; border-top: 1px solid var(--border); }
+  .article-item {
+    display: flex; align-items: center; padding: 10px 18px;
+    border-bottom: 1px solid var(--border); gap: 10px; font-size: 12px; transition: background 0.1s;
+  }
+  .article-item:hover { background: var(--bg); }
+  .article-item .name {
+    flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; max-width: 155px;
+  }
+  .article-item .barcode { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); flex-shrink: 0; }
+  .article-item .qty-badge {
+    background: var(--accent); color: #fff; border-radius: 3px;
+    padding: 2px 6px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .article-item .del {
+    color: var(--muted); cursor: pointer; font-size: 14px; flex-shrink: 0;
+    opacity: 0.4; transition: opacity 0.15s; background: none; border: none; padding: 0 2px;
+  }
+  .article-item .del:hover { opacity: 1; color: var(--accent2); }
+
+  .list-header {
+    padding: 10px 18px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); display: flex; justify-content: center;
+    gap: 0.5mm;
+    align-items: center; background: var(--bg); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 1;
+  }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px;
+    font-weight: 600; background: var(--surface); color: var(--muted); border: 1px solid var(--border);
+  }
+
+  .empty-state { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; }
+  .hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  #importInfo {
+    font-size: 11px; color: var(--muted); padding: 8px 10px; background: var(--bg);
+    border-radius: var(--radius); border: 1px solid var(--border); display: none;
+  }
+
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+  .toolbar {
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+    display: flex; gap: 8px; align-items: center; background: var(--surface);
+  }
+  .toolbar-info { margin-left: auto; font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  .preview-area {
+    flex: 1; overflow: auto; padding: 24px; background: #777;
+    display: flex; justify-content: center; align-items: flex-start;
+  }
+
+  /* A4 sheet — Avery L4732 / compatible 4×10 label layout */
+  .a4-sheet {
+    background: white;
+    width: 210mm;
+    min-height: 297mm;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+    padding: 0mm;
+    display: grid;
+    grid-template-columns: repeat(4, 52.5mm);
+    grid-template-rows: repeat(10, 29.7mm);
+    column-gap: 0mm;
+    row-gap: 0mm;
+    align-content: start;
+  }
+
+  .label {
+    width: 52.5mm;
+    height: 29.7mm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85mm 1mm;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .label .lbl-name {
+    font-size: 6pt;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.2;
+    width: 100%;
+    height: 7mm;
+    color: #000;
+    font-family: 'DM Sans', sans-serif;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    flex-shrink: 0;
+  }
+  .label svg { width: 50mm !important; height: 16mm !important; display: block; flex-shrink: 0; }
+  .label .lbl-bc-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 6.5pt;
+    font-weight: 500;
+    color: #000;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+    align-self: center;
+    height: 3mm;
+    line-height: 1;
+  }
+
+  @media print {
+    @page { size: A4; margin: 0mm; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    header, .sidebar, .toolbar { display: none !important; }
+    .app { display: block !important; }
+    .main { display: block !important; }
+    .preview-area {
+      position: fixed; top: 0; left: 0; width: 210mm;
+      padding: 0; margin: 0; background: white; overflow: visible;
+      display: block !important;
+    }
+    #sheet-container { display: block; }
+    .a4-sheet { box-shadow: none; margin: 0; padding: 0; page-break-after: always; }
+    .a4-sheet:last-child { page-break-after: avoid; }
+  }
+
+  /* ─── MOBILE ─── */
+  @media (max-width: 700px) {
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+      height: auto;
+      min-height: calc(100vh - 49px);
+    }
+    .sidebar {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      max-height: 55vh;
+    }
+    .article-list {
+      max-height: 160px;
+    }
+    .main {
+      height: auto;
+    }
+    .preview-area {
+      padding: 12px;
+      min-height: 400px;
+      align-items: flex-start;
+    }
+    .a4-sheet {
+      transform-origin: top left;
+      transform: scale(var(--sheet-scale, 0.45));
+      margin-bottom: calc((297mm * var(--sheet-scale, 0.45)) - 297mm);
+    }
+    .toolbar {
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 10px 12px;
+    }
+    .toolbar-info {
+      width: 100%;
+      margin-left: 0;
+      font-size: 11px;
+    }
+    header h1 { font-size: 13px; }
+    header span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="2" y="5" width="20" height="14" rx="2"/>
+    <line x1="2" y1="10" x2="22" y2="10"/>
+  </svg>
+  <h1>Generator Naljepnica</h1>
+  <span>52.5 × 29.7 mm &nbsp;·&nbsp; 4×10 &nbsp;·&nbsp; A4</span>
+</header>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('manual')">✏️ Ručni unos</div>
+      <div class="tab" onclick="switchTab('excel')">📊 Excel uvoz</div>
+    </div>
+
+    <!-- MANUAL TAB -->
+    <div class="tab-content active" id="tab-manual">
+      <div>
+        <label>Naziv artikla</label>
+        <textarea id="inp-name" rows="2" placeholder="Npr. Mobitel Xiaomi 14T Pro 12GB/512GB Black"></textarea>
+      </div>
+      <div>
+        <label>Barcode</label>
+        <input type="text" id="inp-barcode" placeholder="2010020595514" maxlength="20">
+      </div>
+      <div class="qty-row">
+        <div>
+          <label>Količina naljepnica</label>
+          <input type="number" id="inp-qty" value="1" min="1" max="40">
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="addArticle()">+ Dodaj</button>
+      </div>
+      <div class="hint">Pritisni <strong>Enter</strong> u polju Barcode za brzo dodavanje.</div>
+    </div>
+
+    <!-- EXCEL TAB -->
+    <div class="tab-content" id="tab-excel">
+      <label class="upload-zone" id="dropZone">
+        <input type="file" id="excelInput" accept=".xlsx,.xls" onchange="handleExcel(this)">
+        <div class="icon">📂</div>
+        <p><strong>Klikni ili prevuci Excel</strong></p>
+        <p style="margin-top:4px">.xlsx / .xls datoteka</p>
+      </label>
+
+      <div id="importInfo"></div>
+
+      <div id="colMapSection" style="display:none; display: flex; flex-direction: column; gap: 8px;">
+        <div>
+          <label>Stupac s nazivom artikla</label>
+          <select id="colName"></select>
+        </div>
+        <div>
+          <label>Stupac s barcodom</label>
+          <select id="colBarcode"></select>
+        </div>
+        <div>
+          <label>Stupac s količinom <span style="font-weight:400;text-transform:none;font-size:10px">(opcionalno)</span></label>
+          <select id="colQty"><option value="">— ne koristi (1 kom) —</option></select>
+        </div>
+        <button class="btn btn-primary" onclick="importFromExcel()">📥 Uvezi sve artikle</button>
+      </div>
+    </div>
+
+    <!-- ARTICLE LIST -->
+    <div class="article-list">
+      <div class="list-header">
+        <span>Lista artikala</span>
+        <span id="totalCount" class="badge">0</span>
+      </div>
+      <div id="articleList">
+        <div class="empty-state">Nema artikala.<br>Dodaj ručno ili uvezi Excel.</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="toolbar">
+      <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Ispis / PDF</button>
+      <button class="btn btn-outline btn-sm" onclick="clearAll()">🗑️ Obriši sve</button>
+      <div class="toolbar-info" id="labelCount">0 / 40 naljepnica</div>
+    </div>
+    <div class="preview-area">
+      <div id="sheet-container"><div class="a4-sheet" id="sheet"></div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let articles = [];
+let excelData = [];
+let excelHeaders = [];
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && name === 'manual') || (i === 1 && name === 'excel'));
+  });
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function addArticle() {
+  const name = document.getElementById('inp-name').value.trim();
+  const barcode = document.getElementById('inp-barcode').value.trim();
+  const qty = parseInt(document.getElementById('inp-qty').value) || 1;
+  if (!name || !barcode) { alert('Molim unesite naziv i barcode.'); return; }
+  articles.push({ name, barcode, qty: Math.max(1, qty) });
+  document.getElementById('inp-name').value = '';
+  document.getElementById('inp-barcode').value = '';
+  document.getElementById('inp-qty').value = '1';
+  document.getElementById('inp-name').focus();
+  render();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('inp-barcode').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addArticle(); }
+  });
+  document.getElementById('inp-name').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('inp-barcode').focus(); }
+  });
+});
+
+function handleExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const wb = XLSX.read(e.target.result, { type: 'binary' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    // Auto-detect header row
+    let headerRow = 0;
+    for (let i = 0; i < Math.min(5, json.length); i++) {
+      if (json[i].filter(c => String(c).trim() !== '').length >= 2) { headerRow = i; break; }
+    }
+
+    excelHeaders = json[headerRow].map((h, i) => ({ label: String(h || ('Stupac ' + (i+1))).trim(), idx: i }));
+    excelData = json.slice(headerRow + 1).filter(r => r.some(c => String(c).trim() !== ''));
+
+    const makeOptions = (preselect) => excelHeaders.map(h =>
+      `<option value="${h.idx}"${h.label.toLowerCase().includes(preselect) ? ' selected' : ''}>${h.label}</option>`
+    ).join('');
+
+    document.getElementById('colName').innerHTML = makeOptions('naziv');
+    document.getElementById('colBarcode').innerHTML = makeOptions('barcode');
+    document.getElementById('colQty').innerHTML =
+      '<option value="">— ne koristi (1 kom) —</option>' +
+      excelHeaders.map(h => `<option value="${h.idx}"${h.label.toLowerCase().includes('koli') ? ' selected' : ''}>${h.label}</option>`).join('');
+
+    const info = document.getElementById('importInfo');
+    info.style.display = 'block';
+    info.textContent = '✅ Učitano: ' + file.name + ' · ' + excelData.length + ' redaka · List: ' + wb.SheetNames[0];
+    document.getElementById('colMapSection').style.display = 'flex';
+  };
+  reader.readAsBinaryString(file);
+}
+
+function importFromExcel() {
+  const ci = parseInt(document.getElementById('colName').value);
+  const cb = parseInt(document.getElementById('colBarcode').value);
+  const cqVal = document.getElementById('colQty').value;
+  const cq = cqVal !== '' ? parseInt(cqVal) : null;
+
+  let added = 0, skipped = 0;
+  excelData.forEach(row => {
+    const name = String(row[ci] || '').trim();
+    const rawBC = String(row[cb] || '').trim();
+    const barcode = rawBC.replace(/[^0-9A-Za-z\-]/g, '');
+    if (!name || !barcode) { skipped++; return; }
+    const qty = cq !== null ? (parseInt(row[cq]) || 1) : 1;
+    articles.push({ name, barcode, qty: Math.max(1, Math.min(qty, 40)) });
+    added++;
+  });
+
+  alert('Uvezeno ' + added + ' artikala.' + (skipped ? '\nPreskočeno: ' + skipped + ' (prazni redovi).' : ''));
+  render();
+}
+
+function removeArticle(i) {
+  articles.splice(i, 1);
+  render();
+}
+
+function clearAll() {
+  if (articles.length > 0 && !confirm('Obrisati sve artikle?')) return;
+  articles = [];
+  render();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderList() {
+  const total = articles.reduce((s, a) => s + a.qty, 0);
+  document.getElementById('totalCount').textContent = articles.length + ' art.';
+  const pages2 = Math.ceil(total / 40) || 1; document.getElementById('labelCount').textContent = total + ' naljepnica · ' + pages2 + ' list' + (pages2 > 1 ? 'a' : '');
+
+  const list = document.getElementById('articleList');
+  if (articles.length === 0) {
+    list.innerHTML = '<div class="empty-state">Nema artikala.<br>Dodaj ručno ili uvezi Excel.</div>';
+    return;
+  }
+  list.innerHTML = articles.map((a, i) => `
+    <div class="article-item">
+      <span class="name" title="${escHtml(a.name)}">${escHtml(a.name)}</span>
+      <span class="barcode">${escHtml(a.barcode)}</span>
+      <span class="qty-badge">×${a.qty}</span>
+      <button class="del" onclick="removeArticle(${i})" title="Obriši">✕</button>
+    </div>
+  `).join('');
+}
+
+function render() {
+  renderList();
+  const container = document.getElementById('sheet-container');
+
+  const labels = [];
+  articles.forEach(a => { for (let i = 0; i < a.qty; i++) labels.push(a); });
+
+  if (labels.length === 0) {
+    container.innerHTML = '<div class="a4-sheet"><div style="grid-column:1/-1;padding:50px 20px;text-align:center;color:#bbb;font-size:13px;font-family:sans-serif;">Dodaj artikle da bi se naljepnice prikazale ovdje</div></div>';
+    return;
+  }
+
+  // Split into pages of 40
+  const pages = [];
+  for (let i = 0; i < labels.length; i += 40) {
+    pages.push(labels.slice(i, i + 40));
+  }
+
+  container.innerHTML = '';
+
+  pages.forEach((pageLabels, pageIdx) => {
+    const pageSheet = document.createElement('div');
+    pageSheet.className = 'a4-sheet';
+    if (pageIdx > 0) pageSheet.style.marginTop = '24px';
+    container.appendChild(pageSheet);
+
+    pageLabels.forEach(a => {
+      const div = document.createElement('div');
+      div.className = 'label';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'lbl-name';
+      nameEl.textContent = a.name;
+      div.appendChild(nameEl);
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      div.appendChild(svg);
+
+      const numEl = document.createElement('div');
+      numEl.className = 'lbl-bc-num';
+      numEl.textContent = a.barcode;
+      div.appendChild(numEl);
+
+      pageSheet.appendChild(div);
+
+      const clean = a.barcode.replace(/\s/g, '');
+      try {
+        CODE128.draw(svg, clean, 1.8);
+      } catch(e) {
+        svg.remove();
+        const err = document.createElement('div');
+        err.style.cssText = 'font-size:8pt;color:red;text-align:center';
+        err.textContent = '⚠ neispravan barcode';
+        div.insertBefore(err, numEl);
+      }
+    });
+  });
+}
+
+// Drag & drop on upload zone
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = '#1a1714'; });
+dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; });
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.style.borderColor = '';
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const inp = document.getElementById('excelInput');
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      inp.files = dt.files;
+    } catch(e) {}
+    handleExcel({ files: [file] });
+    switchTab('excel');
+  }
+});
+
+render();
+
+// PWA - Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+// Mobile scale - fit A4 sheet to screen width
+function updateSheetScale() {
+  const previewEl = document.querySelector('.preview-area');
+  if (!previewEl) return;
+  const availW = previewEl.clientWidth - 24;
+  const sheetMM = 210;
+  const sheetPx = sheetMM * 3.7795;
+  const scale = Math.min(1, availW / sheetPx);
+  document.documentElement.style.setProperty('--sheet-scale', scale.toFixed(3));
+}
+window.addEventListener('resize', updateSheetScale);
+window.addEventListener('load', updateSheetScale);
+updateSheetScale();
+
+</script>
+</body>
+</html>
