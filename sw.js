@@ -1,4 +1,4 @@
-const CACHE = 'naljepnice-v2';
+const CACHE = 'naljepnice-v3';
 const ASSETS = [
   './index.html',
   './manifest.json',
