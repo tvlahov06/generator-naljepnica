@@ -226,18 +226,14 @@ const CODE128 = (() => {
     box-shadow: 0 4px 32px rgba(0,0,0,0.4);
     padding: 0;
     margin: 0;
-    display: grid;
-    grid-template-columns: repeat(4, 52.5mm);
-    grid-template-rows: repeat(10, 29.7mm);
-    column-gap: 0;
-    row-gap: 0;
+    position: relative;
     overflow: hidden;
   }
 
   .label {
+    position: absolute;
     width: 52.5mm;
     height: 29.7mm;
-    max-height: 29.7mm;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -245,7 +241,6 @@ const CODE128 = (() => {
     padding: 1.2mm 2mm 1.2mm;
     overflow: hidden;
     box-sizing: border-box;
-    flex-shrink: 0;
   }
   .label .lbl-name {
     font-size: 5.5pt;
@@ -302,6 +297,8 @@ const CODE128 = (() => {
       page-break-after: always;
       break-after: page;
       overflow: hidden !important;
+      transform: scale(0.99);
+      transform-origin: top left;
     }
     .a4-sheet:last-child {
       page-break-after: avoid;
@@ -560,7 +557,7 @@ function render() {
     if (pageIdx > 0) pageSheet.style.marginTop = '24px';
     container.appendChild(pageSheet);
 
-    pageLabels.forEach(a => {
+    pageLabels.forEach((a, idx) => {
       const div = document.createElement('div');
       div.className = 'label';
 
@@ -577,6 +574,10 @@ function render() {
       numEl.textContent = a.barcode;
       div.appendChild(numEl);
 
+      const col = idx % 4;
+      const row = Math.floor(idx / 4);
+      div.style.left = (col * 52.5) + 'mm';
+      div.style.top = (row * 29.7) + 'mm';
       pageSheet.appendChild(div);
 
       const clean = a.barcode.replace(/\s/g, '');
